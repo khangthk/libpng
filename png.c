@@ -1,7 +1,6 @@
-
 /* png.c - location for general purpose libpng functions
  *
- * Copyright (c) 2018-2024 Cosmin Truta
+ * Copyright (c) 2018-2025 Cosmin Truta
  * Copyright (c) 1998-2002,2004,2006-2018 Glenn Randers-Pehrson
  * Copyright (c) 1996-1997 Andreas Dilger
  * Copyright (c) 1995-1996 Guy Eric Schalnat, Group 42, Inc.
@@ -14,7 +13,7 @@
 #include "pngpriv.h"
 
 /* Generate a compiler error if there is an old png.h in the search path. */
-typedef png_libpng_version_1_6_45_git Your_png_h_is_not_version_1_6_45_git;
+typedef png_libpng_version_1_6_46_git Your_png_h_is_not_version_1_6_46_git;
 
 /* Tells libpng that we have already handled the first "num_bytes" bytes
  * of the PNG file signature.  If the PNG data is embedded into another
@@ -794,8 +793,8 @@ png_get_copyright(png_const_structrp png_ptr)
    return PNG_STRING_COPYRIGHT
 #else
    return PNG_STRING_NEWLINE \
-      "libpng version 1.6.45.git" PNG_STRING_NEWLINE \
-      "Copyright (c) 2018-2024 Cosmin Truta" PNG_STRING_NEWLINE \
+      "libpng version 1.6.46.git" PNG_STRING_NEWLINE \
+      "Copyright (c) 2018-2025 Cosmin Truta" PNG_STRING_NEWLINE \
       "Copyright (c) 1998-2002,2004,2006-2018 Glenn Randers-Pehrson" \
       PNG_STRING_NEWLINE \
       "Copyright (c) 1996-1997 Andreas Dilger" PNG_STRING_NEWLINE \
@@ -1241,7 +1240,7 @@ png_fp_sub(png_int_32 addend0, png_int_32 addend1, int *error)
    else if (addend1 < 0)
    {
       if (0x7fffffff + addend1 >= addend0)
-         return addend0+addend1;
+         return addend0-addend1;
    }
    else
       return addend0;
@@ -1273,7 +1272,7 @@ png_safe_add(png_int_32 *addend0_and_result, png_int_32 addend1,
 static int
 png_xy_from_XYZ(png_xy *xy, const png_XYZ *XYZ)
 {
-   png_int_32 d, dred, dgreen, dwhite, whiteX, whiteY;
+   png_int_32 d, dred, dgreen, dblue, dwhite, whiteX, whiteY;
 
    /* 'd' in each of the blocks below is just X+Y+Z for each component,
     * x, y and z are X,Y,Z/(X+Y+Z).
@@ -1281,43 +1280,51 @@ png_xy_from_XYZ(png_xy *xy, const png_XYZ *XYZ)
    d = XYZ->red_X;
    if (png_safe_add(&d, XYZ->red_Y, XYZ->red_Z))
       return 1;
-   if (png_muldiv(&xy->redx, XYZ->red_X, PNG_FP_1, d) == 0)
-      return 1;
-   if (png_muldiv(&xy->redy, XYZ->red_Y, PNG_FP_1, d) == 0)
-      return 1;
    dred = d;
-   whiteX = XYZ->red_X;
-   whiteY = XYZ->red_Y;
+   if (png_muldiv(&xy->redx, XYZ->red_X, PNG_FP_1, dred) == 0)
+      return 1;
+   if (png_muldiv(&xy->redy, XYZ->red_Y, PNG_FP_1, dred) == 0)
+      return 1;
 
    d = XYZ->green_X;
    if (png_safe_add(&d, XYZ->green_Y, XYZ->green_Z))
       return 1;
-   if (png_muldiv(&xy->greenx, XYZ->green_X, PNG_FP_1, d) == 0)
-      return 1;
-   if (png_muldiv(&xy->greeny, XYZ->green_Y, PNG_FP_1, d) == 0)
-      return 1;
    dgreen = d;
-   whiteX += XYZ->green_X;
-   whiteY += XYZ->green_Y;
+   if (png_muldiv(&xy->greenx, XYZ->green_X, PNG_FP_1, dgreen) == 0)
+      return 1;
+   if (png_muldiv(&xy->greeny, XYZ->green_Y, PNG_FP_1, dgreen) == 0)
+      return 1;
 
    d = XYZ->blue_X;
    if (png_safe_add(&d, XYZ->blue_Y, XYZ->blue_Z))
       return 1;
-   if (png_muldiv(&xy->bluex, XYZ->blue_X, PNG_FP_1, d) == 0)
+   dblue = d;
+   if (png_muldiv(&xy->bluex, XYZ->blue_X, PNG_FP_1, dblue) == 0)
       return 1;
-   if (png_muldiv(&xy->bluey, XYZ->blue_Y, PNG_FP_1, d) == 0)
+   if (png_muldiv(&xy->bluey, XYZ->blue_Y, PNG_FP_1, dblue) == 0)
       return 1;
-   whiteX += XYZ->blue_X;
-   whiteY += XYZ->blue_Y;
 
    /* The reference white is simply the sum of the end-point (X,Y,Z) vectors so
     * the fillowing calculates (X+Y+Z) of the reference white (media white,
     * encoding white) itself:
     */
+   d = dblue;
    if (png_safe_add(&d, dred, dgreen))
       return 1;
-
    dwhite = d;
+
+   /* Find the white X,Y values from the sum of the red, green and blue X,Y
+    * values.
+    */
+   d = XYZ->red_X;
+   if (png_safe_add(&d, XYZ->green_X, XYZ->blue_X))
+      return 1;
+   whiteX = d;
+
+   d = XYZ->red_Y;
+   if (png_safe_add(&d, XYZ->green_Y, XYZ->blue_Y))
+      return 1;
+   whiteY = d;
 
    if (png_muldiv(&xy->whitex, whiteX, PNG_FP_1, dwhite) == 0)
       return 1;
@@ -3382,6 +3389,26 @@ png_fixed(png_const_structrp png_ptr, double fp, png_const_charp text)
    return (png_fixed_point)r;
 }
 #endif
+
+#if defined(PNG_FLOATING_POINT_SUPPORTED) && \
+   !defined(PNG_FIXED_POINT_MACRO_SUPPORTED) && \
+   (defined(PNG_cLLI_SUPPORTED) || defined(PNG_mDCV_SUPPORTED))
+png_uint_32
+png_fixed_ITU(png_const_structrp png_ptr, double fp, png_const_charp text)
+{
+   double r = floor(10000 * fp + .5);
+
+   if (r > 2147483647. || r < 0)
+      png_fixed_error(png_ptr, text);
+
+#  ifndef PNG_ERROR_TEXT_SUPPORTED
+   PNG_UNUSED(text)
+#  endif
+
+   return (png_uint_32)r;
+}
+#endif
+
 
 #if defined(PNG_GAMMA_SUPPORTED) || defined(PNG_COLORSPACE_SUPPORTED) ||\
     defined(PNG_INCH_CONVERSIONS_SUPPORTED) || defined(PNG_READ_pHYs_SUPPORTED)
